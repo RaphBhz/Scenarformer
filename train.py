@@ -2,7 +2,7 @@ import random
 import tiktoken
 import torch
 from pydracor import Corpus, Play
-from model import SimpleModel
+from model.model import SimpleModel
 
 # Loading pydracor API's corpus of french plays
 corpus = Corpus('fre')
@@ -22,31 +22,34 @@ TRAIN_EPISODES = 5
 # Number of steps in each episode
 TRAIN_STEPS = 10
 # Learning rate
-LEARNING_RATE = 1e-2
+LEARNING_RATE = 1e-3
 
 
 def get_raw_data():
-    # We will simply register all the data in a single string
-    data_raw = ''
-    # We sample a set of randomly chosen plays
-    random_play_ids = random.sample(corpus.play_ids(), NUMBER_OF_PLAYS)
+  # We will simply register all the data in a single string
+  data_raw = ''
+  # We sample a set of randomly chosen plays
+  random_play_ids = random.sample(corpus.play_ids(), NUMBER_OF_PLAYS)
 
-    # Extractnig the plays texts
-    for id in random_play_ids:
-        # Extracting a play's spoken text with the pydracor API
-        play = Play(id)
-        data_raw += f'\n{play.spoken_text()}'
+  # Extractnig the plays texts
+  for id in random_play_ids:
+    # Extracting a play's spoken text with the pydracor API
+    play = Play(id)
+    data_raw += f'\n{play.spoken_text()}'
 
-    return data_raw
+  # Logging progress
+  print(f'Extracted "{play.name}"')
+
+  return data_raw
 
 
 def get_batch(data, batch_size, block_size):
-    start_idx = torch.randint(len(data) - block_size, (batch_size,))
+  start_idx = torch.randint(len(data) - block_size, (batch_size,))
 
-    inputs = torch.stack([data[i:i+block_size] for i in start_idx])
-    outputs = torch.stack([data[i+1:i+block_size+1] for i in start_idx])
+  inputs = torch.stack([data[i:i+block_size] for i in start_idx])
+  outputs = torch.stack([data[i+1:i+block_size+1] for i in start_idx])
 
-    return inputs, outputs
+  return inputs, outputs
 
 
 # Getting the raw text data
@@ -65,9 +68,9 @@ batch_input, batch_output = get_batch(train, BATCH_SIZE, BLOCK_SIZE)
 
 # Creating the model
 m = SimpleModel(
-   vocab_size=enc.n_vocab,
-   embedding_size=512,
-   block_size = BLOCK_SIZE
+  vocab_size=enc.n_vocab,
+  embedding_size=512,
+  block_size = BLOCK_SIZE
 )
 # Using torch's Adam optimizer
 optimizer = torch.optim.Adam(m.parameters(), lr=LEARNING_RATE)
@@ -82,3 +85,8 @@ for episode in range(TRAIN_EPISODES):
     loss.backward()
     optimizer.step()
 
+  print(f'Episode {episode+1}: Loss = {loss.item()}')
+
+
+# Printing a sample of generation
+print(enc.decode(m.generate(torch.zeros((1, 1), dtype=torch.long), 500)[0].tolist()))
