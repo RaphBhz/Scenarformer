@@ -6,11 +6,16 @@ class SimpleModel(nn.Module):
   def __init__(self, vocab_size, embedding_size, block_size):
     super().__init__()
     self.token_embedding_table = nn.Embedding(vocab_size, embedding_size)
+    self.position_embedding_table = nn.Embedding(block_size, embedding_size)
     self.linear_layer = nn.Linear(embedding_size, vocab_size)
 
   def forward(self, idx, targets=None):
+    Batch, Block = idx.shape
+
     token_embeddings = self.token_embedding_table(idx)
-    logits = self.linear_layer(token_embeddings)
+    positional_embeddings = self.position_embedding_table(torch.arrange(Block))
+    embeddings = token_embeddings + positional_embeddings
+    logits = self.linear_layer(embeddings)
 
     if targets is None:
       loss = None
