@@ -31,17 +31,21 @@ class MultiHeadAttention(nn.Module):
     self.heads = nn.ModuleList(
       [SelfAttentionHead(head_size, embedding_size, block_size) for _ in range(num_heads)]
     )
+    self.projection = nn.Linear(embedding_size, embedding_size)
 
   def forward(self, x):
-    return torch.cat([h(x) for h in self.heads], dim=-1)
+    y = torch.cat([h(x) for h in self.heads], dim=-1)
+    y = self.projection(y)
+    return y
 
 
 class FeedForwardLayer(nn.Module):
   def __init__(self, embedding_size):
     super().__init__()
     self.network = nn.Sequential(
-      nn.Linear(embedding_size, embedding_size),
+      nn.Linear(embedding_size, 4 * embedding_size),
       nn.ReLU(),
+      nn.Linear(4 * embedding_size, embedding_size),
     )
 
   def forward(self, x):
@@ -49,15 +53,17 @@ class FeedForwardLayer(nn.Module):
 
 
 class DecoderBlock(nn.Module):
-  def __init__(self, _embedding_size, num_heads):
+  def __init__(self, embedding_size, block_size, num_heads):
     super().__init__()
     head_size = embedding_size // num_heads
     self.attention_heads = MultiHeadAttention(head_size, num_heads, embedding_size, block_size)
     self.feedforward_layer = FeedForwardLayer(embedding_size)
+    self.layer_norm1 = nn.LayerNorm(embedding_size)
+    self.layer_norm2 = nn.LayerNorm(embedding_size)
 
   def forward(self, x):
-    x = self.attention_heads(x)
-    x = self.feedforward_layer(x)
+    x += self.attention_heads(x)
+    x += self.feedforward_layer(x)
     return x
     
 
@@ -68,9 +74,10 @@ class SimpleModel(nn.Module):
     self.token_embedding_table = nn.Embedding(vocab_size, embedding_size)
     self.position_embedding_table = nn.Embedding(block_size, embedding_size)
     self.decoder_blocks = nn.Sequential(
-      DecoderBlock(embedding_size, num_heads=4),
-      DecoderBlock(embedding_size, num_heads=4),
-      DecoderBlock(embedding_size, num_heads=4),
+      DecoderBlock(embedding_size, block_size, num_heads=4),
+      DecoderBlock(embedding_size, block_size, num_heads=4),
+      DecoderBlock(embedding_size, block_size, num_heads=4),
+      nn.LayerNorm(embedding_size)
     )
     self.linear_layer = nn.Linear(embedding_size, vocab_size)
 
