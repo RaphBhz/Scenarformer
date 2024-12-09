@@ -25,13 +25,53 @@ class SelfAttentionHead(nn.Module):
     return weights @ values
 
 
-class SimpleModel(nn.Module):
+class MultiHeadAttention(nn.Module):
+  def __init__(self, head_size, num_heads, embedding_size, block_size):
+    super().__init__()
+    self.heads = nn.ModuleList(
+      [SelfAttentionHead(head_size, embedding_size, block_size) for _ in range(num_heads)]
+    )
 
+  def forward(self, x):
+    return torch.cat([h(x) for h in self.heads], dim=-1)
+
+
+class FeedForwardLayer(nn.Module):
+  def __init__(self, embedding_size):
+    super().__init__()
+    self.network = nn.Sequential(
+      nn.Linear(embedding_size, embedding_size),
+      nn.ReLU(),
+    )
+
+  def forward(self, x):
+    return self.network(x)
+
+
+class DecoderBlock(nn.Module):
+  def __init__(self, _embedding_size, num_heads):
+    super().__init__()
+    head_size = embedding_size // num_heads
+    self.attention_heads = MultiHeadAttention(head_size, num_heads, embedding_size, block_size)
+    self.feedforward_layer = FeedForwardLayer(embedding_size)
+
+  def forward(self, x):
+    x = self.attention_heads(x)
+    x = self.feedforward_layer(x)
+    return x
+    
+
+
+class SimpleModel(nn.Module):
   def __init__(self, vocab_size, embedding_size, block_size):
     super().__init__()
     self.token_embedding_table = nn.Embedding(vocab_size, embedding_size)
     self.position_embedding_table = nn.Embedding(block_size, embedding_size)
-    self.attention_head = SelfAttentionHead(embedding_size, embedding_size, block_size)
+    self.decoder_blocks = nn.Sequential(
+      DecoderBlock(embedding_size, num_heads=4),
+      DecoderBlock(embedding_size, num_heads=4),
+      DecoderBlock(embedding_size, num_heads=4),
+    )
     self.linear_layer = nn.Linear(embedding_size, vocab_size)
 
   def forward(self, idx, targets=None):
@@ -41,7 +81,7 @@ class SimpleModel(nn.Module):
     positional_embeddings = self.position_embedding_table(torch.arange(Block))
     
     embeddings = token_embeddings + positional_embeddings
-    embeddings = self.attention_head(embeddings)
+    embeddings = self.decoder_blocks(embeddings)
 
     logits = self.linear_layer(embeddings)
 
