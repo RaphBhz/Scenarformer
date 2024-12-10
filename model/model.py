@@ -62,8 +62,8 @@ class DecoderBlock(nn.Module):
     self.layer_norm2 = nn.LayerNorm(embedding_size)
 
   def forward(self, x):
-    x += self.attention_heads(x)
-    x += self.feedforward_layer(x)
+    x = x + self.attention_heads(x)
+    x = x + self.feedforward_layer(x)
     return x
     
 
