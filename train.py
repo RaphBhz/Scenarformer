@@ -1,59 +1,36 @@
-import random
 import tiktoken
 import torch
-from pydracor import Corpus, Play
+import os.path
+from pydracor import Corpus
 from model.model import SimpleModel
+from data.data import fetch_raw_data, get_raw_data, get_batch
 
 # Loading pydracor API's corpus of french plays
 corpus = Corpus('fre')
 # We set a limit over the number of plays sampled
-NUMBER_OF_PLAYS = 1
+NUMBER_OF_PLAYS = 10
 # Part of data used for validation
 VALIDATION = 0.1
 
 # Using tiktoken's r50k_base encoder
 enc = tiktoken.get_encoding("r50k_base")
 # Number of sequences to train at a time
-BATCH_SIZE = 16
+BATCH_SIZE = 64
 # Size of each sequence
-BLOCK_SIZE = 32
+BLOCK_SIZE = 128
 # Number of episodes to train for
-TRAIN_EPISODES = 5
+TRAIN_EPISODES = 10
 # Number of steps in each episode
-TRAIN_STEPS = 10
+TRAIN_STEPS = 50
 # Learning rate
-LEARNING_RATE = 1e-3
-
-
-def get_raw_data():
-  # We will simply register all the data in a single string
-  data_raw = ''
-  # We sample a set of randomly chosen plays
-  random_play_ids = random.sample(corpus.play_ids(), NUMBER_OF_PLAYS)
-
-  # Extractnig the plays texts
-  for id in random_play_ids:
-    # Extracting a play's spoken text with the pydracor API
-    play = Play(id)
-    data_raw += f'\n{play.spoken_text()}'
-
-  # Logging progress
-  print(f'Extracted "{play.name}"')
-
-  return data_raw
-
-
-def get_batch(data, batch_size, block_size):
-  start_idx = torch.randint(len(data) - block_size, (batch_size,))
-
-  inputs = torch.stack([data[i:i+block_size] for i in start_idx])
-  outputs = torch.stack([data[i+1:i+block_size+1] for i in start_idx])
-
-  return inputs, outputs
+LEARNING_RATE = 1e-4
 
 
 # Getting the raw text data
-data_raw = get_raw_data()
+if os.path.isfile('data/data.txt'):
+  data_raw = get_raw_data()
+else:
+  data_raw = fetch_raw_data(corpus, NUMBER_OF_PLAYS)
 
 # We encode the data
 data = torch.tensor(enc.encode(data_raw), dtype=torch.long)
